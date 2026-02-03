@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Wallet {
+  id        String   @id @default(uuid())
+  address   String   @unique
+  label     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  positions     Position[]
+  trackedTokens TrackedToken[]
+
+  @@map("wallets")
+}
+
+model TrackedToken {
+  id            String   @id @default(uuid())
+  mintAddress   String   @map("mint_address")
+  symbol        String?
+  decimals      Int      @default(9)
+  walletId      String   @map("wallet_id")
+  isActive      Boolean  @default(true)
+  devWallet     String?  @map("dev_wallet")
+  initialSupply String?  @map("initial_supply")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  wallet   Wallet     @relation(fields: [walletId], references: [id])
+  policies Policy[]
+  positions Position[]
+
+  @@unique([mintAddress, walletId])
+  @@index([mintAddress])
+  @@map("tracked_tokens")
+}
+
+model Policy {
+  id             String   @id @default(uuid())
+  name           String
+  trigger        String
+  threshold      Float
+  windowBlocks   Int?     @map("window_blocks")
+  windowSeconds  Int?     @map("window_seconds")
+  action         String
+  actionParams   Json?    @map("action_params")
+  priority       Int      @default(0)
+  isActive       Boolean  @default(true)
+  trackedTokenId String?  @map("tracked_token_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  trackedToken TrackedToken? @relation(fields: [trackedTokenId], references: [id])
+  executions   Execution[]
+
+  @@map("policies")
+}
+
+model Position {
+  id              String   @id @default(uuid())
+  walletId        String   @map("wallet_id")
+  trackedTokenId  String   @map("tracked_token_id")
+  mintAddress     String   @map("mint_address")
+  entryAmountSol  Float    @map("entry_amount_sol")
+  tokenBalance    String   @map("token_balance")
+  entryPrice      Float?   @map("entry_price")
+  status          String   @default("OPEN")
+  openedAt        DateTime @default(now()) @map("opened_at")
+  closedAt        DateTime? @map("closed_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  wallet       Wallet       @relation(fields: [walletId], references: [id])
+  trackedToken TrackedToken @relation(fields: [trackedTokenId], references: [id])
+  executions   Execution[]
+
+  @@index([walletId, status])
+  @@index([mintAddress])
+  @@map("positions")
+}
+
+model Execution {
+  id              String   @id @default(uuid())
+  positionId      String?  @map("position_id")
+  policyId        String?  @map("policy_id")
+  action          String
+  txSignature     String?  @map("tx_signature")
+  status          String   @default("PENDING")
+  amountIn        String?  @map("amount_in")
+  amountOut       String?  @map("amount_out")
+  slippageBps     Int?     @map("slippage_bps")
+  priorityFee     String?  @map("priority_fee")
+  simulationResult Json?   @map("simulation_result")
+  errorMessage    String?  @map("error_message")
+  metadata        Json?
+  createdAt       DateTime @default(now()) @map("created_at")
+  completedAt     DateTime? @map("completed_at")
+
+  position Position? @relation(fields: [positionId], references: [id])
+  policy   Policy?   @relation(fields: [policyId], references: [id])
+
+  @@index([status])
+  @@index([positionId])
+  @@map("executions")
+}
+
+model EventLog {
+  id          String   @id @default(uuid())
+  eventType   String   @map("event_type")
+  source      String
+  payload     Json
+  slot        BigInt?
+  signature   String?
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@index([eventType])
+  @@index([slot])
+  @@index([signature])
+  @@map("event_log")
+}
