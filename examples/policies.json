@@ -1,0 +1,35 @@
+[
+  {
+    "name": "Dev sell > 30% in 10min window",
+    "trigger": "DEV_SELL_PERCENTAGE",
+    "threshold": 30,
+    "windowSeconds": 600,
+    "action": "EXIT_POSITION",
+    "priority": 10
+  },
+  {
+    "name": "Dev sell count > 5",
+    "trigger": "DEV_SELL_COUNT",
+    "threshold": 5,
+    "action": "PARTIAL_SELL",
+    "actionParams": {
+      "sellPercentage": 50,
+      "maxSlippageBps": 500
+    },
+    "priority": 5
+  },
+  {
+    "name": "LP removal > 50%",
+    "trigger": "LP_REMOVAL_PERCENTAGE",
+    "threshold": 50,
+    "action": "EXIT_POSITION",
+    "priority": 10
+  },
+  {
+    "name": "Supply inflation > 10%",
+    "trigger": "SUPPLY_INCREASE",
+    "threshold": 10,
+    "action": "HALT_STRATEGY",
+    "priority": 8
+  }
+]
