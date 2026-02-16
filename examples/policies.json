@@ -1,6 +1,6 @@
 [
   {
-    "name": "Dev sell > 30% in 10min window",
+    "name": "Dev sell > 30% in 10min — full exit",
     "trigger": "DEV_SELL_PERCENTAGE",
     "threshold": 30,
     "windowSeconds": 600,
@@ -8,28 +8,78 @@
     "priority": 10
   },
   {
-    "name": "Dev sell count > 5",
-    "trigger": "DEV_SELL_COUNT",
-    "threshold": 5,
+    "name": "Dev sell > 15% in 5min — half exit",
+    "trigger": "DEV_SELL_PERCENTAGE",
+    "threshold": 15,
+    "windowSeconds": 300,
     "action": "PARTIAL_SELL",
     "actionParams": {
       "sellPercentage": 50,
       "maxSlippageBps": 500
     },
-    "priority": 5
+    "priority": 7
   },
   {
-    "name": "LP removal > 50%",
+    "name": "Dev sell count > 5 — alert",
+    "trigger": "DEV_SELL_COUNT",
+    "threshold": 5,
+    "action": "ALERT_ONLY",
+    "priority": 3
+  },
+  {
+    "name": "Dev sell count > 10 — full exit",
+    "trigger": "DEV_SELL_COUNT",
+    "threshold": 10,
+    "action": "EXIT_POSITION",
+    "priority": 9
+  },
+  {
+    "name": "LP removal > 50% — full exit",
     "trigger": "LP_REMOVAL_PERCENTAGE",
     "threshold": 50,
     "action": "EXIT_POSITION",
     "priority": 10
   },
   {
-    "name": "Supply inflation > 10%",
+    "name": "LP removal > 25% — halt and alert",
+    "trigger": "LP_REMOVAL_PERCENTAGE",
+    "threshold": 25,
+    "action": "HALT_STRATEGY",
+    "priority": 8
+  },
+  {
+    "name": "Supply inflation > 10% — halt strategy",
     "trigger": "SUPPLY_INCREASE",
     "threshold": 10,
     "action": "HALT_STRATEGY",
     "priority": 8
+  },
+  {
+    "name": "Price drop > 40% — full exit",
+    "trigger": "PRICE_DROP_PERCENTAGE",
+    "threshold": 40,
+    "windowSeconds": 120,
+    "action": "EXIT_POSITION",
+    "priority": 10
+  },
+  {
+    "name": "Price drop > 20% — partial sell",
+    "trigger": "PRICE_DROP_PERCENTAGE",
+    "threshold": 20,
+    "windowSeconds": 300,
+    "action": "PARTIAL_SELL",
+    "actionParams": {
+      "sellPercentage": 30,
+      "maxSlippageBps": 400
+    },
+    "priority": 6
+  },
+  {
+    "name": "Wallet outflow > 50 SOL — alert",
+    "trigger": "WALLET_OUTFLOW",
+    "threshold": 50,
+    "windowSeconds": 3600,
+    "action": "ALERT_ONLY",
+    "priority": 4
   }
 ]
