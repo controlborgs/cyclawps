@@ -14,6 +14,7 @@ import { PolicyEngine } from './modules/policy-engine/index.js';
 import { RiskEngine } from './modules/risk-engine/index.js';
 import { ExecutionEngine } from './modules/execution-engine/index.js';
 import { Orchestrator } from './modules/orchestrator/index.js';
+import { PumpFunService } from './modules/pumpfun/index.js';
 import { createServer } from './api/server.js';
 
 async function main(): Promise<void> {
@@ -49,8 +50,9 @@ async function main(): Promise<void> {
   const eventBus = new EventBus(logger);
   const stateEngine = new StateEngine(container, eventBus);
   const policyEngine = new PolicyEngine(container, stateEngine, eventBus);
+  const pumpfun = new PumpFunService(container);
   const riskEngine = new RiskEngine(container, stateEngine);
-  const executionEngine = new ExecutionEngine(container, stateEngine, riskEngine);
+  const executionEngine = new ExecutionEngine(container, stateEngine, riskEngine, pumpfun);
   const eventIngestion = new EventIngestionService(container, eventBus);
   const orchestrator = new Orchestrator(
     container,
@@ -67,7 +69,7 @@ async function main(): Promise<void> {
   await orchestrator.start();
 
   // API server
-  const server = await createServer({ container, policyEngine, eventIngestion });
+  const server = await createServer({ container, policyEngine, eventIngestion, pumpfun, stateEngine });
   await server.listen({ host: env.API_HOST, port: env.API_PORT });
   logger.info({ host: env.API_HOST, port: env.API_PORT }, 'API server listening');
 

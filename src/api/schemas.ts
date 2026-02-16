@@ -52,6 +52,19 @@ export const addTrackedTokenSchema = z.object({
     .optional(),
 });
 
+export const createPositionSchema = z.object({
+  walletId: z.string().uuid(),
+  mintAddress: z
+    .string()
+    .min(32)
+    .max(44)
+    .regex(/^[1-9A-HJ-NP-Za-km-z]+$/, 'Invalid base58 address'),
+  solAmount: z.number().positive(),
+  maxSlippageBps: z.number().int().min(1).max(10000).default(300),
+  priorityFeeLamports: z.number().int().min(0).default(50000),
+});
+
 export type CreatePolicyInput = z.infer<typeof createPolicySchema>;
 export type CreateWalletInput = z.infer<typeof createWalletSchema>;
 export type AddTrackedTokenInput = z.infer<typeof addTrackedTokenSchema>;
+export type CreatePositionInput = z.infer<typeof createPositionSchema>;

@@ -5,16 +5,11 @@ import {
   type TransactionInstruction,
   type SendOptions,
 } from '@solana/web3.js';
-import {
-  getAssociatedTokenAddress,
-  createCloseAccountInstruction,
-  createTransferInstruction,
-  TOKEN_PROGRAM_ID,
-} from '@solana/spl-token';
 import { randomUUID } from 'node:crypto';
 import type { Container } from '../../infra/container.js';
 import type { StateEngine } from '../state-engine/state-engine.service.js';
 import type { RiskEngine } from '../risk-engine/risk-engine.service.js';
+import type { PumpFunService } from '../pumpfun/pumpfun.service.js';
 import type {
   ExecutionRequest,
   ExecutionResult,
@@ -28,11 +23,18 @@ export class ExecutionEngine {
   private readonly container: Container;
   private readonly stateEngine: StateEngine;
   private readonly riskEngine: RiskEngine;
+  private readonly pumpfun: PumpFunService;
 
-  constructor(container: Container, stateEngine: StateEngine, riskEngine: RiskEngine) {
+  constructor(
+    container: Container,
+    stateEngine: StateEngine,
+    riskEngine: RiskEngine,
+    pumpfun: PumpFunService,
+  ) {
     this.container = container;
     this.stateEngine = stateEngine;
     this.riskEngine = riskEngine;
+    this.pumpfun = pumpfun;
   }
 
   async execute(request: ExecutionRequest): Promise<ExecutionResult> {
@@ -93,9 +95,27 @@ export class ExecutionEngine {
       const sellAmount =
         (position.tokenBalance * BigInt(Math.floor(request.sellPercentage))) / BigInt(100);
 
+      // Get quote for logging
+      const mint = new PublicKey(position.mintAddress);
+      const curveState = await this.pumpfun.getBondingCurveState(mint);
+      const quote = this.pumpfun.calculateSellQuote(curveState, sellAmount);
+      const minSolOutput = this.pumpfun.applySlippage(quote.amountOut, request.maxSlippageBps, false);
+
+      logger.info(
+        {
+          executionId,
+          sellAmount: sellAmount.toString(),
+          estimatedSolOut: quote.amountOut.toString(),
+          minSolOutput: minSolOutput.toString(),
+          priceImpactBps: quote.priceImpactBps,
+        },
+        'PumpFun sell quote',
+      );
+
       const transaction = await this.buildSellTransaction(
-        position.mintAddress,
+        mint,
         sellAmount,
+        minSolOutput,
         request.priorityFeeLamports,
       );
 
@@ -132,7 +152,7 @@ export class ExecutionEngine {
         status: 'CONFIRMED',
         txSignature,
         amountIn: sellAmount.toString(),
-        amountOut: null,
+        amountOut: quote.amountOut.toString(),
         errorMessage: null,
         simulationResult: simulation,
         completedAt: new Date(),
@@ -142,7 +162,7 @@ export class ExecutionEngine {
       await this.updatePositionInDb(position.id, newBalance);
 
       logger.info(
-        { executionId, txSignature, amountIn: sellAmount.toString() },
+        { executionId, txSignature, amountIn: sellAmount.toString(), amountOut: quote.amountOut.toString() },
         'Execution confirmed',
       );
 
@@ -168,52 +188,38 @@ export class ExecutionEngine {
   }
 
   private async buildSellTransaction(
-    mintAddress: string,
+    mint: PublicKey,
     amount: bigint,
+    minSolOutput: bigint,
     priorityFeeLamports: number,
   ): Promise<Transaction> {
     const { connection, keypair } = this.container.solana;
-    const mint = new PublicKey(mintAddress);
     const owner = keypair.publicKey;
-
-    const sourceAta = await getAssociatedTokenAddress(mint, owner);
 
     const instructions: TransactionInstruction[] = [];
 
-    // Priority fee
+    // Compute budget
     if (priorityFeeLamports > 0) {
       instructions.push(
         ComputeBudgetProgram.setComputeUnitPrice({
           microLamports: priorityFeeLamports,
         }),
       );
-      instructions.push(
-        ComputeBudgetProgram.setComputeUnitLimit({
-          units: 200_000,
-        }),
-      );
     }
-
-    // For MVP: transfer tokens to a designated sell address
-    // In production, this would integrate with Jupiter/Raydium swap
-    // This demonstrates the transaction building pattern
     instructions.push(
-      createTransferInstruction(
-        sourceAta,
-        sourceAta, // self-transfer for simulation purposes
-        owner,
-        amount,
-        [],
-        TOKEN_PROGRAM_ID,
-      ),
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: 100_000,
+      }),
     );
 
-    // If full exit, close the token account
-    if (amount === BigInt(0)) {
-      instructions.push(
-        createCloseAccountInstruction(sourceAta, owner, owner, [], TOKEN_PROGRAM_ID),
-      );
-    }
+    // PumpFun sell instruction
+    const sellIx = await this.pumpfun.buildSellInstruction(
+      mint,
+      owner,
+      amount,
+      minSolOutput,
+    );
+    instructions.push(sellIx);
 
     const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
 
@@ -250,7 +256,6 @@ export class ExecutionEngine {
     const { connection, keypair } = this.container.solana;
     const logger = this.container.logger;
 
-    // Re-sign with fresh blockhash for each attempt
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
         const { blockhash, lastValidBlockHeight } =
@@ -270,7 +275,6 @@ export class ExecutionEngine {
           options,
         );
 
-        // Wait for confirmation
         const confirmation = await connection.confirmTransaction(
           { signature, blockhash, lastValidBlockHeight },
           'confirmed',

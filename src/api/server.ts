@@ -3,6 +3,8 @@ import rateLimit from '@fastify/rate-limit';
 import type { Container } from '../infra/container.js';
 import type { PolicyEngine } from '../modules/policy-engine/policy-engine.service.js';
 import type { EventIngestionService } from '../modules/event-ingestion/event-ingestion.service.js';
+import type { PumpFunService } from '../modules/pumpfun/pumpfun.service.js';
+import type { StateEngine } from '../modules/state-engine/state-engine.service.js';
 import { healthRoutes } from './routes/health.js';
 import { policyRoutes } from './routes/policies.js';
 import { positionRoutes } from './routes/positions.js';
@@ -13,10 +15,12 @@ export interface ServerDeps {
   container: Container;
   policyEngine: PolicyEngine;
   eventIngestion: EventIngestionService;
+  pumpfun: PumpFunService;
+  stateEngine: StateEngine;
 }
 
 export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
-  const { container, policyEngine, eventIngestion } = deps;
+  const { container, policyEngine, eventIngestion, pumpfun, stateEngine } = deps;
 
   const app = Fastify({
     logger: false, // We use our own Pino instance
@@ -63,7 +67,7 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
   // Register routes
   await healthRoutes(app, container);
   await policyRoutes(app, container, policyEngine);
-  await positionRoutes(app, container);
+  await positionRoutes(app, container, pumpfun, stateEngine);
   await executionRoutes(app, container);
   await walletRoutes(app, container, eventIngestion);
 
