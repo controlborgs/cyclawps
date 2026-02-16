@@ -1,6 +1,8 @@
 # CyclAwps
 
-Autonomous on-chain operations layer for Solana wallets. Monitors wallet activity, evaluates events against declarative policies, and executes on-chain transactions automatically.
+Autonomous execution engine for Solana. Ingests on-chain events in real-time, evaluates them against declarative policies, enforces risk limits, and executes transactions — all within a single event loop, sub-150ms end-to-end.
+
+The foundation layer for [CyclAwps Node](https://github.com/controlborgs/cyclawps-node).
 
 ## Architecture
 
@@ -24,20 +26,20 @@ Solana RPC WebSocket
                                                    └── Persist result
 ```
 
-Each module is independently testable. State is managed in-memory with Redis snapshots and Postgres persistence. The API layer is stateless.
+Every module is independently testable. State lives in-memory with Redis snapshots and Postgres persistence. Zero external dependencies between modules — the EventBus is the only coupling point.
 
-## Monitoring
+## What It Monitors
 
-- Wallet activity (specific addresses)
-- Token account balances
-- Liquidity pool changes (Raydium, Meteora)
-- Dev wallet behavior (sell detection)
-- SPL token supply changes
+- Wallet activity across specific addresses
+- Token account balance changes
+- Liquidity pool events (Raydium, Meteora)
+- Dev wallet behavior — sell detection, velocity tracking
+- SPL token supply changes (mint events)
 - LP removal events
 
 ## Policy Engine
 
-Declarative JSON policies with deterministic evaluation:
+Declarative JSON policies with deterministic, sub-millisecond evaluation:
 
 ```json
 {
@@ -48,15 +50,15 @@ Declarative JSON policies with deterministic evaluation:
 }
 ```
 
-**Supported triggers:** `DEV_SELL_PERCENTAGE`, `DEV_SELL_COUNT`, `LP_REMOVAL_PERCENTAGE`, `SUPPLY_INCREASE`, `PRICE_DROP_PERCENTAGE`
+**Triggers:** `DEV_SELL_PERCENTAGE`, `DEV_SELL_COUNT`, `LP_REMOVAL_PERCENTAGE`, `SUPPLY_INCREASE`, `PRICE_DROP_PERCENTAGE`
 
-**Available actions:** `EXIT_POSITION`, `PARTIAL_SELL`, `HALT_STRATEGY`, `ALERT_ONLY`
+**Actions:** `EXIT_POSITION`, `PARTIAL_SELL`, `HALT_STRATEGY`, `ALERT_ONLY`
+
+Policies are evaluated on every event. No polling. No cron. Instant reaction to on-chain state changes.
 
 ## PumpFun Integration
 
-Buy and sell tokens through PumpFun bonding curves. The execution engine builds real PumpFun program instructions with slippage protection and simulation.
-
-**Open a position:**
+Native PumpFun bonding curve support. The execution engine builds real program instructions — PDA derivation, constant-product AMM math, associated token accounts — with slippage protection and preflight simulation.
 
 ```bash
 curl -X POST http://localhost:3100/positions \
@@ -70,46 +72,50 @@ curl -X POST http://localhost:3100/positions \
   }'
 ```
 
-Sells are triggered automatically by the policy engine through the execution engine's PumpFun sell path.
+Exits are triggered automatically by the policy engine. No manual intervention required.
 
 ## Risk Engine
 
-Every execution request passes through risk checks before TX construction:
+Every execution request passes through the full risk pipeline before a transaction is built:
 
 - Max capital per position
-- Max slippage (bps)
-- Max priority fee
+- Max slippage enforcement (bps)
+- Max priority fee caps
 - Cooldown periods between executions
-- Preflight transaction simulation
+- Preflight transaction simulation (rejects before spending SOL)
+
+Nothing executes without passing all guards.
+
+## Benchmarks
+
+| Metric | Value | Notes |
+|--------|-------|-------|
+| Event ingestion | **8ms** p95 | Solana WS to EventBus |
+| Policy evaluation | **0.3ms** | Cached state, deterministic rules |
+| Risk pipeline | **1.1ms** | All guards including cooldown |
+| TX simulation + send | **120ms** | Full Solana RPC round-trip |
+| State snapshot | **1.2ms** | Redis position + token persistence |
+| **Full event cycle** | **< 150ms** | **Ingest to execute** |
+
+*Mainnet-beta, Helius RPC, m6i.large*
 
 ## Quick Start
 
 ```bash
-# Start Postgres and Redis
 docker compose up -d postgres redis
-
-# Install dependencies
 npm install
-
-# Configure environment
 cp .env.example .env
-# Edit .env with your RPC URL and wallet key
-
-# Run database migrations
 npx prisma migrate dev
-
-# Start in development mode
 npm run dev
 ```
 
 ## Docker
 
 ```bash
-# Full stack
 docker compose up --build
 ```
 
-Multi-stage build produces a minimal production image running as non-root.
+Multi-stage build. Minimal production image. Runs as non-root.
 
 ## API
 
@@ -159,40 +165,6 @@ npm test
 - Zod (runtime validation)
 - Vitest
 
-## Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SOLANA_RPC_URL` | Solana RPC endpoint | — |
-| `SOLANA_WS_URL` | Solana WebSocket endpoint | — |
-| `WALLET_PRIVATE_KEY` | Base64 encoded private key | — |
-| `WALLET_KEYPAIR_PATH` | Path to keypair JSON file | — |
-| `DATABASE_URL` | Postgres connection string | — |
-| `REDIS_URL` | Redis connection string | — |
-| `API_HOST` | API bind address | `0.0.0.0` |
-| `API_PORT` | API port | `3100` |
-| `MAX_POSITION_SIZE_SOL` | Max SOL per position | `1.0` |
-| `MAX_SLIPPAGE_BPS` | Max slippage in basis points | `300` |
-| `MAX_PRIORITY_FEE_LAMPORTS` | Max priority fee | `100000` |
-| `EXECUTION_COOLDOWN_MS` | Min time between executions | `5000` |
-| `LOG_LEVEL` | Pino log level | `info` |
-| `NODE_ENV` | Environment | `development` |
-
-Either `WALLET_PRIVATE_KEY` or `WALLET_KEYPAIR_PATH` must be set. Private keys are never logged.
-
-## Benchmarks
-
-| Metric | Value | Notes |
-|--------|-------|-------|
-| Event ingestion latency | **8ms** p95 | Solana WS to EventBus |
-| Policy evaluation | **0.3ms** | Cached state, deterministic rules |
-| Risk check pipeline | **1.1ms** | All guards including cooldown |
-| TX simulation + send | **120ms** | Including Solana RPC round-trip |
-| State snapshot (Redis) | **1.2ms** | Position + token state persistence |
-| Full event cycle | **< 150ms** | Ingest → evaluate → execute |
-
-*Measured on mainnet-beta, Helius RPC, m6i.large*
-
 ## CyclAwps Node
 
-For autonomous AI-powered operation with agent swarms and shared intelligence, see [cyclawps-node](https://github.com/controlborgs/cyclawps-node). The node builds on this core engine with LLM-powered agents, deployer scoring, wallet graph analysis, and cross-node signal sharing.
+This engine is the execution layer. For autonomous AI-powered operation — agent swarms, shared intelligence across nodes, deployer reputation scoring, wallet graph analysis, and LLM-driven decision making — see [cyclawps-node](https://github.com/controlborgs/cyclawps-node).
