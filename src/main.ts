@@ -19,7 +19,7 @@ import { createServer } from './api/server.js';
 
 async function main(): Promise<void> {
   const logger = createLogger({ LOG_LEVEL: env.LOG_LEVEL, NODE_ENV: env.NODE_ENV });
-  logger.info('ClawOps starting');
+  logger.info('CyclAwps starting');
 
   // Infrastructure
   const db = createPrismaClient(logger);
@@ -88,7 +88,7 @@ async function main(): Promise<void> {
     redis.disconnect();
     await db.$disconnect();
 
-    logger.info('ClawOps shutdown complete');
+    logger.info('CyclAwps shutdown complete');
     process.exit(0);
   };
 
@@ -105,7 +105,7 @@ async function main(): Promise<void> {
     process.exit(1);
   });
 
-  logger.info('ClawOps fully operational');
+  logger.info('CyclAwps fully operational');
 }
 
 main().catch((err) => {

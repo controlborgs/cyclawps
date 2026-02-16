@@ -1,4 +1,4 @@
-# ClawOps
+# CyclAwps
 
 Autonomous on-chain operations layer for Solana wallets. Monitors wallet activity, evaluates events against declarative policies, and executes on-chain transactions automatically.
 
