@@ -179,3 +179,7 @@ npm test
 | `NODE_ENV` | Environment | `development` |
 
 Either `WALLET_PRIVATE_KEY` or `WALLET_KEYPAIR_PATH` must be set. Private keys are never logged.
+
+## CyclAwps Node
+
+For autonomous AI-powered operation with agent swarms and shared intelligence, see [cyclawps-node](https://github.com/controlborgs/cyclawps-node). The node builds on this core engine with LLM-powered agents, deployer scoring, wallet graph analysis, and cross-node signal sharing.
