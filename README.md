@@ -52,6 +52,26 @@ Declarative JSON policies with deterministic evaluation:
 
 **Available actions:** `EXIT_POSITION`, `PARTIAL_SELL`, `HALT_STRATEGY`, `ALERT_ONLY`
 
+## PumpFun Integration
+
+Buy and sell tokens through PumpFun bonding curves. The execution engine builds real PumpFun program instructions with slippage protection and simulation.
+
+**Open a position:**
+
+```bash
+curl -X POST http://localhost:3100/positions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "walletId": "your-wallet-uuid",
+    "mintAddress": "FKPvoUKtnWwPi73SGLQrAux9DeP9RD8eGqrzcwynpump",
+    "solAmount": 0.5,
+    "maxSlippageBps": 300,
+    "priorityFeeLamports": 50000
+  }'
+```
+
+Sells are triggered automatically by the policy engine through the execution engine's PumpFun sell path.
+
 ## Risk Engine
 
 Every execution request passes through risk checks before TX construction:
