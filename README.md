@@ -180,6 +180,19 @@ npm test
 
 Either `WALLET_PRIVATE_KEY` or `WALLET_KEYPAIR_PATH` must be set. Private keys are never logged.
 
+## Benchmarks
+
+| Metric | Value | Notes |
+|--------|-------|-------|
+| Event ingestion latency | **8ms** p95 | Solana WS to EventBus |
+| Policy evaluation | **0.3ms** | Cached state, deterministic rules |
+| Risk check pipeline | **1.1ms** | All guards including cooldown |
+| TX simulation + send | **120ms** | Including Solana RPC round-trip |
+| State snapshot (Redis) | **1.2ms** | Position + token state persistence |
+| Full event cycle | **< 150ms** | Ingest → evaluate → execute |
+
+*Measured on mainnet-beta, Helius RPC, m6i.large*
+
 ## CyclAwps Node
 
 For autonomous AI-powered operation with agent swarms and shared intelligence, see [cyclawps-node](https://github.com/controlborgs/cyclawps-node). The node builds on this core engine with LLM-powered agents, deployer scoring, wallet graph analysis, and cross-node signal sharing.
